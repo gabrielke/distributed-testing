@@ -1,0 +1,52 @@
+#
+# need to create a network in advance with "docker network create backend" 
+#
+#
+version: "3.5"
+services:
+  selenoid:
+    image: "aerokube/selenoid"
+    volumes:
+      - "/etc/selenoid/:/etc/selenoid/:ro" 
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "/etc/selenoid/logs/:/opt/selenoid/logs/"
+    command: ["-listen", ":4444", "-conf", "/etc/selenoid/browsers.json", "-video-output-dir", "/opt/selenoid/video", "-log-output-dir", "/opt/selenoid/logs", "-save-all-logs", "-container-network", "backend"]
+    networks:
+      - backend
+
+  selenoid-ui:
+    image: "aerokube/selenoid-ui"
+    depends_on: 
+      - selenoid
+    ports:
+      - "8080:8080"
+    networks:
+      - backend
+    command: ["--status-uri", "http://ggr-ui:8888", "--webdriver-uri", "http://ggr:4444"]
+
+  ggr:
+    image: "aerokube/ggr:latest-release"
+    ports:
+      - "4444:4444"
+    depends_on:
+      - selenoid
+    volumes:
+      - "/etc/grid-router/:/etc/grid-router:ro"
+    networks:
+      - backend
+        #    command: ["-guests-allowed", "-guests-quota", "test"]
+
+  ggr-ui:
+    image: "aerokube/ggr-ui:latest-release"
+    depends_on:
+      - ggr
+    volumes:
+      - "/etc/grid-router/quota:/etc/grid-router/quota:ro"
+    networks:
+      - backend
+
+networks:
+  backend:
+    external:
+      name: backend
+
